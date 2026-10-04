@@ -1,0 +1,62 @@
+[package]
+name = "omnidrop_core"
+version = "1.0.0"
+edition = "2024"
+description = "OmniDrop core engine: P2P discovery, Noise_XX security and parallel resumable file transfer"
+license = "MIT"
+publish = false
+
+[lib]
+name = "omnidrop_core"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aes-gcm = "0.10.3"
+base64 = "0.23.1"
+chacha20poly1305 = "0.10.1"
+getrandom = "0.3.4"
+hex = "0.4.3"
+hkdf = "0.12.4"
+if-addrs = "0.15.0"
+libc = "0.2.190"
+mdns-sd = "0.21.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.10.9"
+snow = { version = "0.10.0", default-features = false, features = ["default-resolver-crypto"] }
+socket2 = { version = "0.6.5", features = ["all"] }
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "net", "io-util", "time", "sync", "macros", "fs"] }
+walkdir = "2.5.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+io-uring = "0.7.15"
+zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = [
+  "Foundation",
+  "Foundation_Collections",
+  "Devices_Bluetooth",
+  "Devices_Bluetooth_Advertisement",
+  "Devices_Enumeration",
+  "Devices_WiFiDirect",
+  "Networking",
+  "Networking_Connectivity",
+  "Storage_Streams",
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(aes_armv8)', 'cfg(polyval_armv8)'] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true
+panic = "unwind"

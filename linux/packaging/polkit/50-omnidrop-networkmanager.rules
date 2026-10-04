@@ -1,0 +1,20 @@
+// OmniDrop: lets users of an active local session create and tear down Wi-Fi Direct
+// (wifi-p2p) links through NetworkManager's D-Bus API without a sudo/admin password.
+// OmniDrop creates per-user connections (connection.permissions = user:<name>), so only the
+// "own" settings permission is needed, never system-wide changes.
+polkit.addRule(function (action, subject) {
+    if (!subject.local || !subject.active) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (!(subject.isInGroup("sudo") || subject.isInGroup("wheel") ||
+          subject.isInGroup("netdev") || subject.isInGroup("network"))) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    switch (action.id) {
+    case "org.freedesktop.NetworkManager.network-control":
+    case "org.freedesktop.NetworkManager.settings.modify.own":
+    case "org.freedesktop.NetworkManager.wifi.scan":
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

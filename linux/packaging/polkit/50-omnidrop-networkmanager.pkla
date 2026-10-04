@@ -1,0 +1,8 @@
+# Same policy as 50-omnidrop-networkmanager.rules for distributions still on polkit 0.105
+# (local authority .pkla files).
+[OmniDrop Wi-Fi Direct through NetworkManager]
+Identity=unix-group:sudo;unix-group:netdev;unix-group:wheel;unix-group:network
+Action=org.freedesktop.NetworkManager.network-control;org.freedesktop.NetworkManager.settings.modify.own;org.freedesktop.NetworkManager.wifi.scan
+ResultAny=no
+ResultInactive=no
+ResultActive=yes

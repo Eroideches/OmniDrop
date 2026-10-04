@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=OmniDrop
+GenericName=File Transfer
+GenericName[it]=Trasferimento file
+Comment=Fast, end-to-end encrypted peer-to-peer file transfer
+Comment[it]=Trasferimento file P2P veloce e cifrato end-to-end
+Exec=omnidrop
+Icon=omnidrop
+Terminal=false
+Categories=Network;FileTransfer;Utility;
+Keywords=share;send;transfer;p2p;airdrop;wifi direct;bluetooth;
+StartupWMClass=com.eroideches.omnidrop
