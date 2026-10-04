@@ -99,8 +99,10 @@ optimisation (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) so long transfers keep run
 
 ### Windows (10/11)
 The installer can add firewall rules (`firewall-setup.ps1`, also included in the zip). BLE uses the
-WinRT advertisement APIs and Wi-Fi Direct uses `Windows.Devices.WiFiDirect`; unpackaged desktop
-apps need no extra capability declaration for these APIs.
+WinRT advertisement APIs and Wi-Fi Direct uses `Windows.Devices.WiFiDirect`; the installer and
+the zip run as regular desktop apps, which need no capability declaration for these APIs. For an
+optional MSIX package, `packaging/windows/Package.appxmanifest` declares the `wiFiControl`,
+`bluetooth`, `radios` and `privateNetworkClientServer` capabilities.
 
 ### Linux (Ubuntu / Debian / Arch)
 Wi-Fi Direct goes through NetworkManager's D-Bus API (NM ≥ 1.16 with a P2P-capable

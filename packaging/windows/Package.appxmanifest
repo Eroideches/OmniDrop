@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Optional MSIX packaging of the Windows build (the default release ships the Inno Setup installer
+  and a portable zip, which run as regular desktop apps and need no capability declarations).
+  When OmniDrop is packaged as MSIX, these capabilities grant access to the WinRT Wi-Fi Direct and
+  Bluetooth LE APIs and to inbound LAN connections:
+
+    makeappx pack /d <bundle-with-this-file-as-AppxManifest.xml> /p OmniDrop.msix
+    signtool sign /fd SHA256 /a /f <certificate.pfx> OmniDrop.msix
+-->
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap rescap">
+  <Identity Name="Eroideches.OmniDrop" Publisher="CN=Eroideches" Version="1.0.0.0" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>OmniDrop</DisplayName>
+    <PublisherDisplayName>Eroideches</PublisherDisplayName>
+    <Logo>data\flutter_assets\assets\icon.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us" />
+    <Resource Language="it-it" />
+  </Resources>
+  <Applications>
+    <Application Id="OmniDrop" Executable="omnidrop.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+          DisplayName="OmniDrop"
+          Description="Fast, end-to-end encrypted P2P file transfer"
+          BackgroundColor="transparent"
+          Square150x150Logo="data\flutter_assets\assets\icon.png"
+          Square44x44Logo="data\flutter_assets\assets\icon.png" />
+    </Application>
+  </Applications>
+  <Capabilities>
+    <Capability Name="internetClientServer" />
+    <Capability Name="privateNetworkClientServer" />
+    <rescap:Capability Name="runFullTrust" />
+    <DeviceCapability Name="wiFiControl" />
+    <DeviceCapability Name="bluetooth" />
+    <DeviceCapability Name="radios" />
+  </Capabilities>
+</Package>

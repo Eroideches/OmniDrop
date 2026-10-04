@@ -1051,6 +1051,46 @@ fn apply_resume(sched: &Scheduler, resume: &[ResumeInfo]) -> io::Result<()> {
     Ok(())
 }
 
+/// Tries every known address of `peer_id` until one completes the Noise handshake with the
+/// expected identity (an address may now belong to another device, e.g. after a DHCP change).
+async fn connect_authenticated(
+    core: &Arc<Core>,
+    peer_id: &str,
+) -> io::Result<(TcpStream, SocketAddrV4, security::Established)> {
+    let addrs = core.registry.addresses(peer_id);
+    if addrs.is_empty() {
+        return Err(io_err(
+            io::ErrorKind::NotFound,
+            "device has no reachable IP address (connect via Wi-Fi Direct or the same network)",
+        ));
+    }
+    let mut last_err = None;
+    for addr in addrs {
+        let attempt = async {
+            let mut stream = networking::connect_tuned(addr, Duration::from_secs(4)).await?;
+            stream.write_all(MAGIC_CTRL).await?;
+            let est = tokio::time::timeout(
+                Duration::from_secs(15),
+                security::handshake(&mut stream, &core.identity, &core.local_hello(), true),
+            )
+            .await
+            .map_err(|_| io_err(io::ErrorKind::TimedOut, "handshake timed out"))??;
+            if est.peer_id != peer_id {
+                return Err(io_err(
+                    io::ErrorKind::PermissionDenied,
+                    "the device at this address has a different identity key",
+                ));
+            }
+            Ok((stream, est))
+        };
+        match attempt.await {
+            Ok((stream, est)) => return Ok((stream, addr, est)),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| io_err(io::ErrorKind::NotFound, "no address")))
+}
+
 async fn sender_session(
     core: &Arc<Core>,
     t: &Arc<Transfer>,
@@ -1058,20 +1098,7 @@ async fn sender_session(
     resume: bool,
 ) -> io::Result<Outcome> {
     let peer_id = t.peer.lock().unwrap().id.clone();
-    let (mut stream, addr) = networking::connect_peer(core, &peer_id).await?;
-    stream.write_all(MAGIC_CTRL).await?;
-    let est = tokio::time::timeout(
-        Duration::from_secs(15),
-        security::handshake(&mut stream, &core.identity, &core.local_hello(), true),
-    )
-    .await
-    .map_err(|_| io_err(io::ErrorKind::TimedOut, "handshake timed out"))??;
-    if est.peer_id != peer_id {
-        return Err(io_err(
-            io::ErrorKind::PermissionDenied,
-            "the device at this address has a different identity key",
-        ));
-    }
+    let (stream, addr, est) = connect_authenticated(core, &peer_id).await?;
     {
         let mut p = t.peer.lock().unwrap();
         p.name = est.peer.name.clone();
@@ -2101,7 +2128,8 @@ async fn run_receiver(
     let mut paused_rx = t.paused_tx.subscribe();
     let mut local_paused_sent = t.local_paused.load(Ordering::Relaxed);
     let result: io::Result<bool> = loop {
-        for (index, ok, error) in inc.finalize_ready() {
+        let finalized = tokio::task::block_in_place(|| inc.finalize_ready());
+        for (index, ok, error) in finalized {
             writer
                 .send_json(&Ctrl::FileResult { index, ok, error })
                 .await?;

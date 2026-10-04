@@ -17,7 +17,7 @@ use crate::events;
 use crate::security::PROTOCOL_VERSION;
 use crate::transfer;
 use crate::util::Os;
-use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
+use mdns_sd::{IfKind, ServiceDaemon, ServiceEvent, ServiceInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use socket2::{Domain, Protocol, SockRef, Socket, TcpKeepalive, Type};
@@ -132,6 +132,12 @@ impl Registry {
         if info.id == self.self_id || info.id.len() != 16 {
             return;
         }
+        // A loopback/unspecified address announced by another device would point back to us.
+        let addr = addr.filter(|a| {
+            let ip = a.ip();
+            !ip.is_unspecified()
+                && !(ip.is_loopback() && matches!(transport, Transport::Mdns | Transport::Broadcast | Transport::Ble))
+        });
         let now = Instant::now();
         let mut entries = self.entries.lock().unwrap();
         let mut is_new = false;
@@ -449,25 +455,6 @@ pub async fn connect_tuned(addr: SocketAddrV4, timeout: Duration) -> io::Result<
     Ok(stream)
 }
 
-/// Connects to the first reachable address of `id`.
-pub async fn connect_peer(core: &Arc<Core>, id: &str) -> io::Result<(TcpStream, SocketAddrV4)> {
-    let addrs = core.registry.addresses(id);
-    if addrs.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "device has no reachable IP address (connect via Wi-Fi Direct or the same network)",
-        ));
-    }
-    let mut last_err = None;
-    for addr in addrs {
-        match connect_tuned(addr, Duration::from_secs(4)).await {
-            Ok(s) => return Ok((s, addr)),
-            Err(e) => last_err = Some(e),
-        }
-    }
-    Err(last_err.unwrap_or_else(|| io::Error::other("no address")))
-}
-
 fn bind_listener() -> io::Result<TcpListener> {
     let try_bind = |port: u16| -> io::Result<TcpListener> {
         let socket = TcpSocket::new_v4()?;
@@ -755,6 +742,10 @@ impl Drop for AbortOnDrop {
 
 fn start_mdns(core: &Arc<Core>, stop: Arc<AtomicBool>) -> io::Result<ServiceDaemon> {
     let daemon = ServiceDaemon::new().map_err(|e| io::Error::other(e.to_string()))?;
+    // Transfers are IPv4 and loopback addresses must never be advertised to other devices.
+    for kind in [IfKind::LoopbackV4, IfKind::LoopbackV6, IfKind::IPv6] {
+        let _ = daemon.disable_interface(kind);
+    }
     let info = core.device_info();
     let mut props = HashMap::new();
     props.insert("id".to_string(), info.id.clone());
@@ -870,10 +861,7 @@ impl Discovery {
         };
         let ble = if settings.ble && !core.host_handles_radio {
             match crate::platform::start_ble(core.clone()) {
-                Ok(h) => {
-                    events::emit("ble_state", json!({"available": true, "active": true}));
-                    Some(h)
-                }
+                Ok(h) => Some(h),
                 Err(e) => {
                     events::emit(
                         "ble_state",
@@ -973,4 +961,22 @@ mod tests {
         assert_eq!(snap.len(), 1);
         assert!(snap[0].reachable);
     }
+
+    #[test]
+    fn ignores_loopback_from_discovery() {
+        let r = Registry::new("ffffffffffffffff".into());
+        let info = DeviceInfo {
+            id: "0011223344556677".into(),
+            name: "Remote".into(),
+            os: Os::Windows,
+            port: 44850,
+            version: 1,
+        };
+        let lo = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 44850);
+        r.observe(info.clone(), Some(lo), Transport::Mdns);
+        assert!(r.addresses("0011223344556677").is_empty());
+        r.observe(info, Some(lo), Transport::Manual);
+        assert_eq!(r.addresses("0011223344556677"), vec![lo]);
+    }
 }
+

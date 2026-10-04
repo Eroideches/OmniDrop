@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.eroideches.omnidrop"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android is compiled against API 37 (compileSdk only, targetSdk unchanged).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

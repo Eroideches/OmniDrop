@@ -72,6 +72,9 @@ add_dependencies(${BINARY_NAME} omnidrop_core)
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
+# permission_handler_windows still compiles with /await (<experimental/coroutine>), which the
+# MSVC STL shipped with Visual Studio 2026 rejects unless the deprecation is acknowledged.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 include(flutter/generated_plugins.cmake)
 
 
